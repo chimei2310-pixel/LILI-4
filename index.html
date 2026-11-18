@@ -1,0 +1,1632 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>民國 116 年度國定假日抽班與排班管理系統</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background-color: white !important;
+            }
+            .print-shadow-none {
+                box-shadow: none !important;
+                border: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-teal-700 text-white shadow-md sticky top-0 z-50 no-print">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-white/10 p-2.5 rounded-xl backdrop-blur-sm">
+                    <i class="fa-solid fa-hospital-user text-2xl text-teal-200"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold tracking-tight">民國 116 年度國定假日抽班與排班管理系統</h1>
+                    <p class="text-xs sm:text-sm text-teal-100">奇美醫療體系・4大專屬頁籤與自動平均排班引擎 (含開診狀況設定與單筆刪除、盲選抽班)</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <button onclick="autoSchedule()" class="bg-amber-500 hover:bg-amber-600 text-white font-medium px-4 py-2 rounded-lg shadow transition flex items-center gap-2 text-sm">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> 一鍵自動平均排班 (匿名)
+                </button>
+                <button onclick="exportCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-lg shadow transition flex items-center gap-2 text-sm">
+                    <i class="fa-solid fa-file-excel"></i> 匯出 Excel (CSV)
+                </button>
+                <button onclick="window.print()" class="bg-slate-600 hover:bg-slate-700 text-white font-medium px-4 py-2 rounded-lg shadow transition flex items-center gap-2 text-sm">
+                    <i class="fa-solid fa-print"></i> 列印報表
+                </button>
+                <button onclick="resetData()" class="bg-rose-600 hover:bg-rose-700 text-white font-medium px-4 py-2 rounded-lg shadow transition flex items-center gap-2 text-sm" title="恢復預設資料">
+                    <i class="fa-solid fa-rotate-right"></i> 重設
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 py-6 flex-grow w-full space-y-6">
+
+        <!-- Notification Banner -->
+        <div id="toast" class="hidden bg-teal-50 border border-teal-200 text-teal-800 px-4 py-3 rounded-xl shadow-sm flex items-center justify-between no-print">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-circle-check text-teal-600"></i>
+                <span id="toast-msg" class="text-sm font-medium">操作成功！</span>
+            </div>
+            <button onclick="hideToast()" class="text-teal-600 hover:text-teal-800 font-bold">&times;</button>
+        </div>
+
+        <!-- Tabs Navigation -->
+        <div class="flex border-b border-slate-200 overflow-x-auto no-print">
+            <button onclick="switchTab('tab1')" id="tab-btn-tab1" class="tab-btn py-3 px-4 font-semibold text-teal-700 border-b-2 border-teal-600 whitespace-nowrap flex items-center gap-2">
+                <i class="fa-solid fa-calendar-days"></i> 1. 國定假日清單與開診狀況
+            </button>
+            <button onclick="switchTab('tab2')" id="tab-btn-tab2" class="tab-btn py-3 px-4 font-medium text-slate-500 hover:text-slate-700 whitespace-nowrap flex items-center gap-2">
+                <i class="fa-solid fa-clock"></i> 2. 班別設定與勞基法排班規則
+            </button>
+            <button onclick="switchTab('tab4')" id="tab-btn-tab4" class="tab-btn py-3 px-4 font-medium text-slate-500 hover:text-slate-700 whitespace-nowrap flex items-center gap-2">
+                <i class="fa-solid fa-users"></i> 3. 同仁名單管理 (<span id="staff-count">16</span>)
+            </button>
+            <button onclick="switchTab('tab5')" id="tab-btn-tab5" class="tab-btn py-3 px-4 font-medium text-slate-500 hover:text-slate-700 whitespace-nowrap flex items-center gap-2">
+                <i class="fa-solid fa-table-cells"></i> 4. 排班檢視與盲選抽班 (<span id="holiday-count">17</span>)
+            </button>
+        </div>
+
+        <!-- ================= Tab 1 ================= -->
+        <div id="tab-tab1" class="tab-content space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800">民國 116 年度國定假日清單與開診狀況設定</h2>
+                        <p class="text-sm text-slate-500">檢視與透過跳出視窗修改各國定假日之開診狀況與對應上班班別，亦可支援單一項目刪除。</p>
+                    </div>
+                    <button onclick="saveAllSettings()" class="bg-teal-600 hover:bg-teal-700 text-white font-medium px-5 py-2.5 rounded-lg shadow transition flex items-center gap-2 text-sm">
+                        <i class="fa-solid fa-floppy-disk"></i> 修改儲存設定
+                    </button>
+                </div>
+
+                <div class="bg白 border-2 border-teal-200 rounded-2xl p-5 space-y-4 shadow-sm">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-teal-900 text-base flex items-center gap-2">
+                            <i class="fa-solid fa-hospital text-teal-600"></i> 🏥 開診狀況與上班班別設定 (可自由維護與對應)
+                        </h3>
+                    </div>
+                    <p class="text-xs text-slate-500">在此定義各開診狀況代號所對應的上班班別與需求人數。修改後點擊「修改儲存設定」即可生效。</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="clinic-templates-container"></div>
+                </div>
+
+                <div class="bg-teal-50/60 border border-teal-200 rounded-2xl p-5 space-y-4 text-slate-700">
+                    <h3 class="font-bold text-teal-900 text-base flex items-center gap-2">
+                        <i class="fa-solid fa-scale-balanced text-teal-600"></i> ⚖️ 平均分配計算（公平性原則）
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                        <div class="space-y-2">
+                            <h4 class="font-bold text-slate-800">📌 每日班別與人力需求：</h4>
+                            <ul class="list-disc list-inside space-y-1 text-slate-600">
+                                <li><strong>上班 5 人</strong>：分別對應 5 種班別代號 <span class="font-mono font-bold text-teal-700">D△、D▲、E△、E▲、N</span>。</li>
+                                <li><strong>休假 11 人</strong>：標示為 <span class="font-mono font-bold text-slate-600">休</span>。</li>
+                                <li>總計每日 16 人參與輪班。</li>
+                            </ul>
+                        </div>
+                        <div class="space-y-2">
+                            <h4 class="font-bold text-slate-800">📊 總人次與平均分攤：</h4>
+                            <ul class="list-disc list-inside space-y-1 text-slate-600">
+                                <li><strong>總上班人次：16 天 × 5 人 = 80 人次</strong></li>
+                                <li><strong>總休假人次：16 天 × 11 人 = 176 人次</strong></li>
+                                <li><strong>每人平均分攤</strong>：系統依據現有天數自動最佳化平均分配。</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-4 pt-2">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-slate-800 text-base">國定假日與開診狀況對照表</h3>
+                        <button onclick="openHolidayModal()" class="bg-teal-600 hover:bg-teal-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition flex items-center gap-2">
+                            <i class="fa-solid fa-calendar-plus"></i> 新增國定假日
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700 border-b border-slate-200">
+                                    <th class="p-3 font-semibold w-16">#</th>
+                                    <th class="p-3 font-semibold">日期</th>
+                                    <th class="p-3 font-semibold">節日名稱</th>
+                                    <th class="p-3 font-semibold w-24">星期</th>
+                                    <th class="p-3 font-semibold">開診狀況與上班班別設定</th>
+                                    <th class="p-3 font-semibold text-center w-36">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="holiday-table-body" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="flex justify-end pt-4 border-t border-slate-200">
+                    <button onclick="saveAllSettings()" class="bg-teal-600 hover:bg-teal-700 text-white font-medium px-6 py-2.5 rounded-lg shadow transition flex items-center gap-2 text-sm">
+                        <i class="fa-solid fa-floppy-disk"></i> 修改儲存設定
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= Tab 2 ================= -->
+        <div id="tab-tab2" class="tab-content space-y-6 hidden">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-8">
+                <div class="space-y-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-800">班別設定與起訖時段管理</h2>
+                            <p class="text-sm text-slate-500">各欄位皆可自行編輯、新增或刪除班別與時段規定。</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="openShiftRuleModal()" class="bg-teal-600 hover:bg-teal-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition flex items-center gap-2">
+                                <i class="fa-solid fa-plus"></i> 新增班別
+                            </button>
+                            <button onclick="saveAllSettings()" class="bg-teal-600 hover:bg-teal-700 text-white font-medium px-5 py-2.5 rounded-lg shadow transition flex items-center gap-2 text-sm">
+                                <i class="fa-solid fa-floppy-disk"></i> 修改儲存設定
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700 border-b border-slate-200">
+                                    <th class="p-3 font-semibold">班表代號</th>
+                                    <th class="p-3 font-semibold w-24">起時</th>
+                                    <th class="p-3 font-semibold w-24">迄時</th>
+                                    <th class="p-3 font-semibold">排班規則說明</th>
+                                    <th class="p-3 font-semibold text-center w-28">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="shift-rule-table-body" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="space-y-6 pt-6 border-t border-slate-200">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800">勞基法排班規則與過渡限制</h2>
+                        <p class="text-sm text-slate-500">各欄位皆可自由修改與補充，系統自動依此進行檢核與排班。</p>
+                    </div>
+
+                    <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-4 text-amber-900">
+                        <h3 class="font-bold text-base flex items-center gap-2">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-600"></i> 重點法規與單位排班核心原則
+                        </h3>
+                        <div class="space-y-3 text-sm">
+                            <div class="flex items-start gap-2">
+                                <span class="font-bold text-amber-700">1.</span>
+                                <p><strong>11小時休息間隔 (勞基法第34條)</strong>：以上任何班別接隔天班都須連續間隔 11 小時之排班。</p>
+                            </div>
+                            <div class="flex items-start gap-2">
+                                <span class="font-bold text-amber-700">2.</span>
+                                <p><strong>小夜班過渡限制 (E6、E△、E▲)</strong>：隔天不可接 CO、CO*、CO5、CO台、D6、D7、D△、D▲、A3、F台、D1、Y7、I3。</p>
+                            </div>
+                            <div class="flex items-start gap-2">
+                                <span class="font-bold text-amber-700">3.</span>
+                                <p><strong>大夜班排班規範 (N)</strong>：前一天一定要 off，隔天可接任何一個班。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-2">自訂補充排班規則與備註 (可直接編輯儲存)：</label>
+                        <textarea id="custom-labor-rules" rows="5" class="w-full border border-slate-300 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="在此輸入其他單位特有排班限制..."></textarea>
+                    </div>
+                </div>
+
+                <div class="flex justify-end pt-4 border-t border-slate-200">
+                    <button onclick="saveAllSettings()" class="bg-teal-600 hover:bg-teal-700 text-white font-medium px-6 py-2.5 rounded-lg shadow transition flex items-center gap-2 text-sm">
+                        <i class="fa-solid fa-floppy-disk"></i> 修改儲存設定
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= Tab 3: 同仁名單 ================= -->
+        <div id="tab-tab4" class="tab-content space-y-6 hidden">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800">單位同仁名單管理</h2>
+                        <p class="text-sm text-slate-500">管理參與排班的同仁名單（目前共 <span id="staff-count-heading">16</span> 位）。</p>
+                    </div>
+                    <button onclick="saveAllSettings()" class="bg-teal-600 hover:bg-teal-700 text-white font-medium px-5 py-2.5 rounded-lg shadow transition flex items-center gap-2 text-sm">
+                        <i class="fa-solid fa-floppy-disk"></i> 修改儲存設定
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2 w-full sm:w-96">
+                    <input type="text" id="new-staff-name" placeholder="輸入同仁姓名..." class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 flex-grow">
+                    <button onclick="addStaff()" class="bg-teal-600 hover:bg-teal-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition whitespace-nowrap">
+                        <i class="fa-solid fa-user-plus"></i> 新增同仁
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3" id="staff-grid"></div>
+
+                <div class="flex justify-end pt-4 border-t border-slate-200">
+                    <button onclick="saveAllSettings()" class="bg-teal-600 hover:bg-teal-700 text-white font-medium px-6 py-2.5 rounded-lg shadow transition flex items-center gap-2 text-sm">
+                        <i class="fa-solid fa-floppy-disk"></i> 修改儲存設定
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= Tab 4: 排班檢視與盲選抽班 ================= -->
+        <div id="tab-tab5" class="tab-content space-y-6 hidden">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800">排班檢視與盲選抽班樂趣區</h2>
+                        <p class="text-sm text-slate-500">點擊「一鍵自動平均排班 (匿名)」先產出籤號總表（1~16號）。同仁可透過下方選擇自己並進行「盲選抽班」揭曉姓名！</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button onclick="autoSchedule()" class="bg-amber-500 hover:bg-amber-600 text-white font-medium px-4 py-2 rounded-lg shadow transition flex items-center gap-2 text-sm">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> 一鍵自動平均排班 (匿名)
+                        </button>
+                        <button onclick="saveAllSettings()" class="bg-teal-600 hover:bg-teal-700 text-white font-medium px-5 py-2.5 rounded-lg shadow transition flex items-center gap-2 text-sm">
+                            <i class="fa-solid fa-floppy-disk"></i> 修改儲存設定
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 盲選區 -->
+                <div class="bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-700 text-white border-2 border-teal-400 rounded-2xl p-6 shadow-xl space-y-5 no-print">
+                    <div class="flex items-center justify-between border-b border-white/20 pb-3">
+                        <h3 class="font-black text-xl flex items員 gap-3 tracking-wide text-amber-300 drop-shadow-md">
+                            <i class="fa-solid fa-ticket text-2xl text-amber-300 animate-bounce"></i> 🎫 同仁盲選抽籤區 (趣味抽班體驗)
+                        </h3>
+                        <div class="flex items-center gap-2">
+                            <button onclick="resetBlindDraw()" class="bg-rose-500 hover:bg-rose-600 text白 font-bold px-3 py-1.5 rounded-lg text-xs shadow transition flex items-center gap-1.5 border border-rose-300">
+                                <i class="fa-solid fa-rotate-right"></i> 重置抽籤 (重新抽班)
+                            </button>
+                            <span class="bg-amber-400 text-teal-950 font-bold px-3 py-1 rounded-full text-xs shadow">
+                                點選名字 ➔ 立即盲抽籤號
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-5 items-end">
+                        <div class="space-y-1.5">
+                            <label class="block text-xs font-bold text-teal-100 tracking-wider">① 選擇要抽籤的同仁 (已抽過者自動從清單移除)</label>
+                            <select id="blind-staff-select" class="w-full border-2 border-amber-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-4 focus:ring-amber-300 bg-white font-black text-teal-950 shadow-inner"></select>
+                        </div>
+                        <div class="space-y-1.5">
+                            <button onclick="executeBlindDraw()" class="w-full bg-amber-400 hover:bg-amber-300 text-teal-950 font-black px-6 py-3.5 rounded-xl text-base transition shadow-lg transform hover:-translate-y-0.5 flex items-center justify-center gap-2 border-2 border-amber-200">
+                                <i class="fa-solid fa-dice text-xl text-teal-950"></i> ② 進行盲選抽班 (彈窗揭曉籤號)
+                            </button>
+                        </div>
+                        <div class="space-y-1.5">
+                            <button onclick="revealAllBlindDraw()" class="w-full bg-slate-900/60 hover:bg-slate-900/80 text-white font-bold px-5 py-3.5 rounded-xl text-sm transition shadow border border-white/30 flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-eye text-teal-300"></i> 一鍵揭曉全部籤號
+                            </button>
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-teal-100 font-medium bg-black/20 p-3 rounded-xl border border-white/10 leading-relaxed">
+                        💡 <strong>操作說明</strong>：點擊「一鍵自動平均排班 (匿名)」後，總表將僅以「籤號 1 ~ 16」呈現，不顯示姓名。請同仁在此下拉選單點選自己的名字，並按下按鈕進行盲選，系統將彈出專屬大獎視窗展示您的專屬籤號，並即時於總表中翻牌顯示真實姓名！
+                    </p>
+                </div>
+
+                <!-- 鎖班設定 -->
+                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4 no-print">
+                    <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                        <i class="fa-solid fa-lock text-teal-600"></i> 🔒 特殊同仁鎖定特定國定假日班別設定 (如育嬰假區間)
+                    </h3>
+                    <p class="text-xs text-slate-500">若特定同仁在某個或連續國定假日必須固定特定班別（或休假），可在此建立鎖定規則，鎖定後將直接呈現姓名與班別。</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">選擇同仁</label>
+                            <select id="tab5-lock-staff" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">鎖定類型</label>
+                            <select id="tab5-lock-type" onchange="toggleTab5LockMode()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white">
+                                <option value="single">單一特定國定假日</option>
+                                <option value="range">日期區間 (連續多個假日)</option>
+                            </select>
+                        </div>
+                        <div id="tab5-single-box">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">選擇國定假日</label>
+                            <select id="tab5-lock-holiday" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"></select>
+                        </div>
+                        <div id="tab5-range-box" class="hidden grid grid-cols-2 gap-1">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">起始</label>
+                                <select id="tab5-lock-start" class="w-full border border-slate-300 rounded-lg px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"></select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">結束</label>
+                                <select id="tab5-lock-end" class="w-full border border-slate-300 rounded-lg px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"></select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">鎖定班別代號</label>
+                            <div class="flex gap-2">
+                                <select id="tab5-lock-shift" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white font-bold">
+                                    <option value="休">休 (休假)</option>
+                                    <option value="D△">D△</option>
+                                    <option value="D▲">D▲</option>
+                                    <option value="E△">E△</option>
+                                    <option value="E▲">E▲</option>
+                                    <option value="N">N</option>
+                                </select>
+                                <button onclick="addTab5Lock()" class="bg-teal-600 hover:bg-teal-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition whitespace-nowrap">
+                                    <i class="fa-solid fa-plus"></i> 新增
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-2">
+                        <h4 class="font-bold text-xs text-slate-600 uppercase tracking-wider mb-2">目前已生效的特殊同仁排班鎖定清單</h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="bg-slate-100 text-slate-700 border-b border-slate-200">
+                                        <th class="p-2 font-semibold w-12">#</th>
+                                        <th class="p-2 font-semibold">同仁姓名</th>
+                                        <th class="p-2 font-semibold">鎖定假日 / 區間</th>
+                                        <th class="p-2 font-semibold w-24">鎖定班別</th>
+                                        <th class="p-2 font-semibold text-center w-20">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tab5-lock-tbody" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-4 no-print bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <span class="text-sm font-medium text-slate-600">班別代號說明：</span>
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">D△</span>
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">D▲</span>
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">E△</span>
+                        <span class="inline-flex items員 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">E▲</span>
+                        <span class="inline-flex items員 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">N</span>
+                        <span class="inline-flex items員 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">休</span>
+                    </div>
+                    <div class="text-xs text-slate-500">
+                        💡 未抽籤同仁顯示為「籤號 1~16 (匿名)」，抽籤後即時揭曉真實姓名與排班。
+                    </div>
+                </div>
+
+                <!-- 直式排班表 -->
+                <div class="bg-white rounded-xl border border-slate-200 overflow-hidden print-shadow-none">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr id="schedule-header" class="bg-slate-100 text-slate-700 border-b border-slate-200 font-semibold text-xs"></tr>
+                            </thead>
+                            <tbody id="schedule-body" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 個人統計卡片區（依籤號排序） -->
+                <div class="space-y-4 pt-4 border-t border-slate-200">
+                    <h3 class="font-bold text-slate-800 text-base">個人上班與休假天數統計</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="stats-grid"></div>
+                </div>
+
+                <div class="flex justify-end pt-4 border-t border-slate-200">
+                    <button onclick="saveAllSettings()" class="bg-teal-600 hover:bg-teal-700 text白 font-medium px-6 py-2.5 rounded-lg shadow transition flex items-center gap-2 text-sm">
+                        <i class="fa-solid fa-floppy-disk"></i> 修改儲存設定
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 mt-auto no-print">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500">
+            國定假日抽班與排班管理系統 &copy; 116 年度 | 奇美醫療體系標準化設計
+        </div>
+    </footer>
+
+    <!-- Blind Draw Modal -->
+    <div id="blind-draw-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg白 rounded-3xl shadow-2xl max-w-sm w-full p-8 space-y-6 text-center animate-in fade-in zoom-in duration-300 border-4 border-teal-500">
+            <div class="w-20 h-20 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center mx-auto text-4xl shadow-inner">
+                <i class="fa-solid fa-ticket-simple"></i>
+            </div>
+            <div class="space-y-2">
+                <h3 class="text-xs font-bold tracking-widest text-teal-600 uppercase">🎉 盲選抽班大揭曉 🎉</h3>
+                <h4 id="modal-staff-name" class="text-2xl font-black text-slate-800">同仁姓名</h4>
+            </div>
+            <div class="bg-teal-50 border border-teal-200 rounded-2xl py-5 px-4 space-y-1">
+                <span class="text-xs text-teal-700 font-semibold block">恭喜您抽中的專屬籤號為</span>
+                <div class="text-5xl font-black text-teal-800 font-mono tracking-tight" id="modal-ticket-number">第 0 號</div>
+            </div>
+            <p class="text-xs text-slate-500">
+                該籤號已與您的姓名成功綁定，總表與統計已同步更新！
+            </p>
+            <div class="pt-2">
+                <button onclick="closeBlindDrawModalAndNext()" class="w-full bg-teal-600 hover:bg-teal-700 text白 font-bold py-3 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-2 text-base">
+                    <i class="fa-solid fa-arrow-right"></i> 確認並按下一位抽班
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Holiday Modal -->
+    <div id="holiday-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg白 rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in duration-200">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 id="holiday-modal-title" class="text-lg font-bold text-slate-800">編輯國定假日與開診狀況</h3>
+                <button onclick="closeHolidayModal()" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
+            </div>
+            <input type="hidden" id="holiday-edit-index" value="-1">
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">日期 (例如: 1/1 或 12/25)</label>
+                    <input type="text" id="modal-holiday-date" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="1/1">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">節日名稱</label>
+                    <input type="text" id="modal-holiday-name" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="元旦">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">星期</label>
+                    <select id="modal-holiday-weekday" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white">
+                        <option value="週一">週一</option>
+                        <option value="週二">週二</option>
+                        <option value="週三">週三</option>
+                        <option value="週四">週四</option>
+                        <option value="週五">週五</option>
+                        <option value="週六">週六</option>
+                        <option value="週日">週日</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">開診狀況</label>
+                    <select id="modal-holiday-status" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"></select>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeHolidayModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition">取消</button>
+                <button onclick="saveHolidayModal()" class="px-4 py-2 rounded-lg text-sm font-medium bg-teal-600 hover:bg-teal-700 text白 transition">確認</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shift Rule Modal -->
+    <div id="shift-rule-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg白 rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in duration-200">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 id="shift-rule-modal-title" class="text-lg font-bold text-slate-800">新增班別</h3>
+                <button onclick="closeShiftRuleModal()" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
+            </div>
+            <input type="hidden" id="shift-rule-edit-index" value="-1">
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">班表代號</label>
+                    <input type="text" id="modal-sr-code" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="例如: D△, N">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">起時</label>
+                        <input type="text" id="modal-sr-start" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="08:00">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">迄時</label>
+                        <input type="text" id="modal-sr-end" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="17:00">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">排班規則說明</label>
+                    <textarea id="modal-sr-rule" rows="3" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="例如：前一天一定要off..."></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeShiftRuleModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition">取消</button>
+                <button onclick="saveShiftRuleModal()" class="px-4 py-2 rounded-lg text-sm font-medium bg-teal-600 hover:bg-teal-700 text白 transition">確認</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const defaultStaff = [
+            "賴冠汝", "林欣怡", "甘婉霏", "李文雄", "林芬萍", "方勇得", "徐詣勛", "邱婷瑩",
+            "甘芷芸", "周琦崴", "黃惠琳", "黃鈺珊", "賴俊穎", "黃乙玲", "鄭宛淇", "賴儀溱"
+        ];
+
+        let clinicTemplates = [
+            { id: "full_rest", name: "全日休診", shifts: ["D△", "D▲", "E△", "E▲", "N"] },
+            { id: "morning_diag", name: "上午診", shifts: [] },
+            { id: "afternoon_diag", name: "上下午診", shifts: [] }
+        ];
+
+        const defaultHolidays = [
+            { date: "2/28", name: "和平紀念日", weekday: "週日", clinicStatusId: "full_rest" },
+            { date: "3/1", name: "和平紀念日(補假)", weekday: "週一", clinicStatusId: "full_rest" },
+            { date: "4/4", name: "兒童節", weekday: "週日", clinicStatusId: "full_rest" },
+            { date: "4/5", name: "清明節", weekday: "週一", clinicStatusId: "full_rest" },
+            { date: "4/6", name: "兒童節(補假)", weekday: "週二", clinicStatusId: "full_rest" },
+            { date: "4/30", name: "勞動節(補假)", weekday: "週五", clinicStatusId: "full_rest" },
+            { date: "5/1", name: "勞動節", weekday: "週六", clinicStatusId: "full_rest" },
+            { date: "6/9", name: "端午節", weekday: "週三", clinicStatusId: "full_rest" },
+            { date: "9/15", name: "中秋節", weekday: "週三", clinicStatusId: "full_rest" },
+            { date: "9/28", name: "孔子誕辰紀念日", weekday: "週二", clinicStatusId: "full_rest" },
+            { date: "10/10", name: "國慶日", weekday: "週日", clinicStatusId: "full_rest" },
+            { date: "10/11", name: "國慶日(補假)", weekday: "週一", clinicStatusId: "full_rest" },
+            { date: "10/25", name: "臺灣光復暨金門古寧頭大捷紀念日", weekday: "週一", clinicStatusId: "full_rest" },
+            { date: "12/24", name: "行憲紀念日(補假)", weekday: "週五", clinicStatusId: "full_rest" },
+            { date: "12/25", name: "行憲紀念日", weekday: "週六", clinicStatusId: "full_rest" },
+            { date: "12/31", name: "117年元旦(補假)", weekday: "週五", clinicStatusId: "full_rest" }
+        ];
+
+        const defaultShiftRules = [
+            { code: "CO、CO*、CO5、CO台", start: "08:00", end: "17:00", rule: "" },
+            { code: "D6、D7、D△、D▲", start: "08:00", end: "16:30", rule: "" },
+            { code: "A3", start: "09:00", end: "17:30", rule: "" },
+            { code: "F台", start: "09:00", end: "18:00", rule: "" },
+            { code: "S2", start: "12:00", end: "20:30", rule: "" },
+            { code: "W7", start: "15:30", end: "22:00", rule: "" },
+            { code: "E6、E△、E▲", start: "15:30", end: "00:00", rule: "隔天不可接CO、CO*、CO5、CO台、D6、D7、D△、D▲、A3、F台、D1、Y7、I3" },
+            { code: "N", start: "00:00", end: "08:30", rule: "前一天一定要off,隔天可接任何一個班" },
+            { code: "D1", start: "08:00", end: "12:00", rule: "" },
+            { code: "Y7", start: "08:00", end: "14:00", rule: "" },
+            { code: "I3", start: "09:00", end: "13:00", rule: "" }
+        ];
+
+        let staffList = [];
+        let holidayList = [];
+        let shiftRules = [];
+        let scheduleData = {};
+        let shiftLocks = [];
+        let blindDrawMap = {};
+
+        function parseHolidayDateToNumber(dateStr) {
+            const m = dateStr.match(/^(\d{1,2})\/(\d{1,2})$/);
+            if (!m) return Number.MAX_SAFE_INTEGER;
+            const month = parseInt(m[1], 10);
+            const day = parseInt(m[2], 10);
+            return month * 100 + day;
+        }
+
+        function sortHolidaysAndRebuildSchedule() {
+            const combined = holidayList.map((h, idx) => ({
+                holiday: h,
+                oldIndex: idx
+            }));
+
+            combined.sort((a, b) => {
+                const da = parseHolidayDateToNumber(a.holiday.date);
+                const db = parseHolidayDateToNumber(b.holiday.date);
+                return da - db;
+            });
+
+            holidayList = combined.map(item => item.holiday);
+
+            const indexMap = {};
+            combined.forEach((item, newIdx) => {
+                indexMap[item.oldIndex] = newIdx;
+            });
+
+            const newScheduleData = {};
+            Object.keys(scheduleData).forEach(oldIdxStr => {
+                const oldIdx = parseInt(oldIdxStr, 10);
+                const newIdx = indexMap[oldIdx];
+                if (newIdx !== undefined) {
+                    newScheduleData[newIdx] = scheduleData[oldIdx];
+                }
+            });
+            scheduleData = newScheduleData;
+
+            shiftLocks.forEach(lock => {
+                if (lock.holidayIndexStart !== undefined && indexMap[lock.holidayIndexStart] !== undefined) {
+                    lock.holidayIndexStart = indexMap[lock.holidayIndexStart];
+                }
+                if (lock.holidayIndexEnd !== undefined && indexMap[lock.holidayIndexEnd] !== undefined) {
+                    lock.holidayIndexEnd = indexMap[lock.holidayIndexEnd];
+                }
+            });
+        }
+
+        function initApp() {
+            const savedStaff = localStorage.getItem('chimei_v14_staff');
+            const savedHolidays = localStorage.getItem('chimei_v14_holidays');
+            const savedTemplates = localStorage.getItem('chimei_v14_templates');
+            const savedRules = localStorage.getItem('chimei_v14_rules');
+            const savedSchedule = localStorage.getItem('chimei_v14_schedule');
+            const savedLabor = localStorage.getItem('chimei_v14_labor_text');
+            const savedLocks = localStorage.getItem('chimei_v14_locks');
+            const savedDraw = localStorage.getItem('chimei_v14_draw');
+
+            staffList = savedStaff ? JSON.parse(savedStaff) : [...defaultStaff];
+            holidayList = savedHolidays ? JSON.parse(savedHolidays) : [...defaultHolidays];
+            clinicTemplates = savedTemplates ? JSON.parse(savedTemplates) : clinicTemplates;
+            shiftRules = savedRules ? JSON.parse(savedRules) : [...defaultShiftRules];
+            shiftLocks = savedLocks ? JSON.parse(savedLocks) : [];
+            blindDrawMap = savedDraw ? JSON.parse(savedDraw) : {};
+
+            if (savedLabor !== null) {
+                const laborEl = document.getElementById('custom-labor-rules');
+                if (laborEl) laborEl.value = savedLabor;
+            }
+
+            if (savedSchedule) {
+                scheduleData = JSON.parse(savedSchedule);
+            } else {
+                generateInitialSchedule();
+            }
+
+            sortHolidaysAndRebuildSchedule();
+            applyLocksToSchedule();
+            renderAll();
+        }
+
+        function saveAllSettings() {
+            clinicTemplates.forEach(t => {
+                const input = document.getElementById(`template-shifts-${t.id}`);
+                if (input) {
+                    t.shifts = input.value.split(',').map(s => s.trim()).filter(s => s.length > 0);
+                }
+            });
+
+            localStorage.setItem('chimei_v14_staff', JSON.stringify(staffList));
+            localStorage.setItem('chimei_v14_holidays', JSON.stringify(holidayList));
+            localStorage.setItem('chimei_v14_templates', JSON.stringify(clinicTemplates));
+            localStorage.setItem('chimei_v14_rules', JSON.stringify(shiftRules));
+            localStorage.setItem('chimei_v14_schedule', JSON.stringify(scheduleData));
+            localStorage.setItem('chimei_v14_locks', JSON.stringify(shiftLocks));
+            localStorage.setItem('chimei_v14_draw', JSON.stringify(blindDrawMap));
+            
+            const laborEl = document.getElementById('custom-labor-rules');
+            if (laborEl) {
+                localStorage.setItem('chimei_v14_labor_text', laborEl.value);
+            }
+
+            applyLocksToSchedule();
+            renderAll();
+            showToast("所有頁籤設定與排班資料已成功儲存！");
+        }
+
+        function resetData() {
+            if (confirm("確定要重設所有資料回到預設狀態嗎？")) {
+                localStorage.clear();
+                staffList = [...defaultStaff];
+                holidayList = [...defaultHolidays];
+                clinicTemplates = [
+                    { id: "full_rest", name: "全日休診", shifts: ["D△", "D▲", "E△", "E▲", "N"] },
+                    { id: "morning_diag", name: "上午診", shifts: [] },
+                    { id: "afternoon_diag", name: "上下午診", shifts: [] }
+                ];
+                shiftRules = [...defaultShiftRules];
+                shiftLocks = [];
+                blindDrawMap = {};
+                generateInitialSchedule();
+                sortHolidaysAndRebuildSchedule();
+                saveAllSettings();
+                showToast("已成功重設所有資料！");
+            }
+        }
+
+        function applyLocksToSchedule() {
+            shiftLocks.forEach(lock => {
+                const start = lock.holidayIndexStart;
+                const end = lock.holidayIndexEnd !== undefined ? lock.holidayIndexEnd : start;
+                for (let i = start; i <= end; i++) {
+                    if (scheduleData[i]) {
+                        scheduleData[i][lock.staff] = lock.shift;
+                    }
+                }
+            });
+        }
+
+        function generateInitialSchedule() {
+            scheduleData = {};
+            holidayList.forEach((h, hIdx) => {
+                scheduleData[hIdx] = {};
+                staffList.forEach(s => {
+                    scheduleData[hIdx][s] = "休";
+                });
+            });
+
+            holidayList.forEach((h, hIdx) => {
+                const template = clinicTemplates.find(t => t.id === h.clinicStatusId) || clinicTemplates[0];
+                const requiredShifts = template.shifts || [];
+                if (requiredShifts.length > 0) {
+                    const dNum = parseHolidayDateToNumber(h.date);
+                    const month = Math.floor(dNum / 100) || 12;
+                    
+                    let availableStaff = [...staffList];
+                    if (month < 9) {
+                        availableStaff = availableStaff.filter(s => s !== "鄭宛淇");
+                        const shuffledOthers = availableStaff.sort(() => 0.5 - Math.random());
+                        const selectedStaff = [...shuffledOthers.slice(0, requiredShifts.length - 1)];
+                        if (Math.random() < 0.3) selectedStaff.push("鄭宛淇");
+                        else selectedStaff.push(staffList.filter(s => !selectedStaff.includes(s))[0] || "鄭宛淇");
+
+                        requiredShifts.forEach((shift, i) => {
+                            if (selectedStaff[i]) {
+                                scheduleData[hIdx][selectedStaff[i]] = shift;
+                            }
+                        });
+                    } else {
+                        const shuffledStaff = [...staffList].sort(() => 0.5 - Math.random());
+                        requiredShifts.forEach((shift, i) => {
+                            if (shuffledStaff[i]) {
+                                scheduleData[hIdx][shuffledStaff[i]] = shift;
+                            }
+                        });
+                    }
+                }
+            });
+        }
+
+        function autoSchedule() {
+            scheduleData = {};
+            let workCounts = {};
+            staffList.forEach(s => workCounts[s] = 0);
+
+            // 重排班時，抽籤結果清空，鎖班只控制班表，不再先給籤號
+            blindDrawMap = {};
+
+            holidayList.forEach((h, hIdx) => {
+                scheduleData[hIdx] = {};
+                staffList.forEach(s => {
+                    scheduleData[hIdx][s] = "休";
+                });
+
+                const template = clinicTemplates.find(t => t.id === h.clinicStatusId) || clinicTemplates[0];
+                const requiredShifts = template.shifts || [];
+                const countNeeded = requiredShifts.length;
+
+                if (countNeeded > 0) {
+                    const dNum = parseHolidayDateToNumber(h.date);
+                    const month = Math.floor(dNum / 100) || 12;
+
+                    let sortedStaff = [...staffList].sort((a, b) => {
+                        let scoreA = workCounts[a];
+                        let scoreB = workCounts[b];
+                        if (month < 9) {
+                            if (a === "鄭宛淇") scoreA += 4;
+                            if (b === "鄭宛淇") scoreB += 4;
+                        }
+                        return scoreA - scoreB;
+                    });
+
+                    const selectedStaff = sortedStaff.slice(0, countNeeded);
+                    
+                    requiredShifts.forEach((shift, i) => {
+                        const staffName = selectedStaff[i];
+                        if (staffName) {
+                            scheduleData[hIdx][staffName] = shift;
+                            workCounts[staffName]++;
+                        }
+                    });
+                }
+            });
+
+            // 套用鎖班規則覆蓋對應班別
+            applyLocksToSchedule();
+            saveAllSettings();
+            showToast("已成功產出自動平均排班表 (匿名 1~16 號)！");
+        }
+
+        // 特殊規則：鄭宛淇抽到時固定 15 號
+        function getTicketNumberForStaff(staffName) {
+            // 若已經有籤號就直接回傳
+            if (blindDrawMap[staffName]) {
+                return blindDrawMap[staffName];
+            }
+
+            // 取得已使用的所有籤號
+            const assignedEntries = Object.entries(blindDrawMap);
+            const assignedValues = assignedEntries.map(([, v]) => v);
+
+            const TOTAL = staffList.length;
+
+            // 特別處理：鄭宛淇 -> 一律拿 15 號
+            if (staffName === "鄭宛淇") {
+                const targetNo = 15;
+
+                // 如果 15 號已被其他人使用，就把那個人換到空號
+                if (assignedValues.includes(targetNo)) {
+                    // 找到目前是 15 號的人
+                    const holder = assignedEntries.find(([, v]) => v === targetNo);
+                    if (holder) {
+                        const holderName = holder[0];
+                        // 找一個尚未使用的號碼給他
+                        const allNumbers = Array.from({ length: TOTAL }, (_, i) => i + 1);
+                        const availableNumbers = allNumbers.filter(n => !assignedValues.includes(n) || n === targetNo); 
+                        // 把 15 移除，避免又分配回去
+                        const cleanAvailable = availableNumbers.filter(n => n !== targetNo);
+                        const newNo = cleanAvailable.length > 0 ? cleanAvailable[0] : 1;
+                        blindDrawMap[holderName] = newNo;
+                    }
+                }
+
+                // 最後把 15 號指定給鄭宛淇
+                blindDrawMap[staffName] = targetNo;
+                return targetNo;
+            }
+
+            // 一般人：從剩下的號碼裡隨機挑一個
+            const allNumbers = [];
+            for (let i = 1; i <= TOTAL; i++) allNumbers.push(i);
+
+            // 若 15 號現在未被使用，但你也可以選到 15（讓系統繼續公平隨機）；
+            // 如果你希望 15 專屬給鄭宛淇，可在這裡把 15 排除：
+            // const filtered = allNumbers.filter(n => !assignedValues.includes(n) && n !== 15);
+            const filtered = allNumbers.filter(n => !assignedValues.includes(n));
+
+            let chosen;
+            if (filtered.length > 0) {
+                const idx = Math.floor(Math.random() * filtered.length);
+                chosen = filtered[idx];
+            } else {
+                chosen = 1;
+            }
+
+            blindDrawMap[staffName] = chosen;
+            return chosen;
+        }
+
+        function executeBlindDraw() {
+            const selectEl = document.getElementById('blind-staff-select');
+            if (!selectEl) return;
+            const staffName = selectEl.value;
+            if (!staffName) {
+                alert("請先選擇要抽籤的同仁！");
+                return;
+            }
+
+            const ticketNo = getTicketNumberForStaff(staffName);
+            saveAllSettings();
+
+            const modalNameEl = document.getElementById('modal-staff-name');
+            const modalTicketEl = document.getElementById('modal-ticket-number');
+            const modalEl = document.getElementById('blind-draw-modal');
+            if (modalNameEl) modalNameEl.innerText = staffName;
+            if (modalTicketEl) modalTicketEl.innerText = `第 ${ticketNo} 號`;
+            if (modalEl) modalEl.classList.remove('hidden');
+        }
+
+        function closeBlindDrawModalAndNext() {
+            const modalEl = document.getElementById('blind-draw-modal');
+            if (modalEl) modalEl.classList.add('hidden');
+            renderBlindDrawStaffSelect();
+            renderAll();
+        }
+
+        function revealAllBlindDraw() {
+            if (confirm("確定要一鍵揭曉所有同仁的盲選籤號嗎？")) {
+                staffList.forEach((s, idx) => {
+                    if (!blindDrawMap[s]) {
+                        // 對於尚未抽的人，也套用同一套規則（含鄭宛淇 15 號）
+                        getTicketNumberForStaff(s);
+                    }
+                });
+                saveAllSettings();
+                showToast("所有盲選籤號已全數揭曉！");
+            }
+        }
+
+        function resetBlindDraw() {
+            if (confirm("確定要重置所有同仁的抽籤結果嗎？重置後所有同仁將重新恢復為未抽籤狀態，可重新進行盲選抽班。")) {
+                blindDrawMap = {};
+                saveAllSettings();
+                renderBlindDrawStaffSelect();
+                renderAll();
+                showToast("已成功重置抽籤結果！");
+            }
+        }
+
+        function renderAll() {
+            renderHolidayTable();
+            renderClinicTemplates();
+            renderShiftRulesTable();
+            renderStaffList();
+            renderTab5LockUI();
+            renderBlindDrawStaffSelect();
+            renderScheduleTable();
+            renderStats();
+            
+            const staffCountEl = document.getElementById('staff-count');
+            const staffHeadingEl = document.getElementById('staff-count-heading');
+            const holidayCountEl = document.getElementById('holiday-count');
+
+            if (staffCountEl) staffCountEl.innerText = staffList.length;
+            if (staffHeadingEl) staffHeadingEl.innerText = staffList.length;
+            if (holidayCountEl) holidayCountEl.innerText = holidayList.length;
+        }
+
+        function renderClinicTemplates() {
+            const container = document.getElementById('clinic-templates-container');
+            if (!container) return;
+            let html = '';
+            clinicTemplates.forEach(t => {
+                html += `
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 shadow-xs">
+                        <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+                            <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-hospital text-teal-600"></i> ${t.name}
+                            </h4>
+                            <span class="text-xs font-semibold bg-teal-100 text-teal-800 px-2 py-0.5 rounded-md">
+                                ${t.shifts.length} 人
+                            </span>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">上班班別代號 (逗號分隔)：</label>
+                            <input type="text" id="template-shifts-${t.id}" value="${t.shifts.join(', ')}" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500 font-mono" placeholder="D△, D▲, E△, E▲, N">
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function renderBlindDrawStaffSelect() {
+            const selectEl = document.getElementById('blind-staff-select');
+            if (!selectEl) return;
+            
+            const availableStaff = staffList.filter(s => {
+                const alreadyDrawn = blindDrawMap[s] !== undefined;
+                return !alreadyDrawn;
+            });
+
+            if (availableStaff.length === 0) {
+                selectEl.innerHTML = `<option value="">所有同仁皆已完成抽籤！</option>`;
+                return;
+            }
+
+            selectEl.innerHTML = availableStaff.map(s => {
+                return `<option value="${s}">⭐ ${s} (尚未抽籤)</option>`;
+            }).join('');
+        }
+
+        function toggleTab5LockMode() {
+            const type = document.getElementById('tab5-lock-type').value;
+            const singleBox = document.getElementById('tab5-single-box');
+            const rangeBox = document.getElementById('tab5-range-box');
+            if (type === 'single') {
+                if (singleBox) singleBox.classList.remove('hidden');
+                if (rangeBox) rangeBox.classList.add('hidden');
+            } else {
+                if (singleBox) singleBox.classList.add('hidden');
+                if (rangeBox) rangeBox.classList.remove('hidden');
+            }
+        }
+
+        function renderTab5LockUI() {
+            const staffSelect = document.getElementById('tab5-lock-staff');
+            if (staffSelect) {
+                staffSelect.innerHTML = staffList.map(s => `<option value="${s}">${s}</option>`).join('');
+            }
+
+            const holidayOptions = holidayList.map((h, idx) => `<option value="${idx}">${h.date} - ${h.name}</option>`).join('');
+            const singleSel = document.getElementById('tab5-lock-holiday');
+            const startSel = document.getElementById('tab5-lock-start');
+            const endSel = document.getElementById('tab5-lock-end');
+
+            if (singleSel) singleSel.innerHTML = holidayOptions;
+            if (startSel) startSel.innerHTML = holidayOptions;
+            if (endSel) endSel.innerHTML = holidayOptions;
+
+            const tbody = document.getElementById('tab5-lock-tbody');
+            if (!tbody) return;
+
+            if (shiftLocks.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-slate-400 text-xs">目前尚無任何排班鎖定規則</td></tr>`;
+                return;
+            }
+
+            let html = '';
+            shiftLocks.forEach((lock, index) => {
+                let rangeText = "";
+                if (lock.holidayIndexStart === lock.holidayIndexEnd || lock.holidayIndexEnd === undefined) {
+                    const h = holidayList[lock.holidayIndexStart];
+                    rangeText = h ? `${h.date} (${h.name})` : `第 ${lock.holidayIndexStart + 1} 筆假日`;
+                } else {
+                    const hs = holidayList[lock.holidayIndexStart];
+                    const he = holidayList[lock.holidayIndexEnd];
+                    rangeText = hs && he ? `${hs.date} ~ ${he.date} (${hs.name} ~ ${he.name})` : `區間`;
+                }
+
+                html += `
+                    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                        <td class="p-2 text-slate-500 font-semibold">${index + 1}</td>
+                        <td class="p-2 font-bold text-teal-700">${lock.staff}</td>
+                        <td class="p-2 text-slate-700">${rangeText}</td>
+                        <td class="p-2"><span class="px-2 py-0.5 rounded text-xs font-semibold bg-teal-100 text-teal-800">${lock.shift}</span></td>
+                        <td class="p-2 text-center">
+                            <button onclick="removeTab5Lock(${index})" class="text-rose-600 hover:text-rose-800 p-1 transition" title="刪除鎖定">
+                                <i class="fa-solid fa-trash"></i> 刪除
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function addTab5Lock() {
+            const staff = document.getElementById('tab5-lock-staff').value;
+            const type = document.getElementById('tab5-lock-type').value;
+            const shift = document.getElementById('tab5-lock-shift').value;
+
+            let startIdx = 0;
+            let endIdx = 0;
+
+            if (type === 'single') {
+                startIdx = parseInt(document.getElementById('tab5-lock-holiday').value, 10);
+                endIdx = startIdx;
+            } else {
+                startIdx = parseInt(document.getElementById('tab5-lock-start').value, 10);
+                endIdx = parseInt(document.getElementById('tab5-lock-end').value, 10);
+                if (startIdx > endIdx) {
+                    alert("起始假日不可晚於結束假日！");
+                    return;
+                }
+            }
+
+            shiftLocks.push({
+                id: Date.now(),
+                staff,
+                holidayIndexStart: startIdx,
+                holidayIndexEnd: endIdx,
+                shift
+            });
+
+            applyLocksToSchedule();
+            saveAllSettings();
+            showToast(`已成功為同仁 ${staff} 建立排班鎖定規則！`);
+        }
+
+        function removeTab5Lock(index) {
+            shiftLocks.splice(index, 1);
+            applyLocksToSchedule();
+            saveAllSettings();
+            showToast("已成功移除排班鎖定規則！");
+        }
+
+        function renderHolidayTable() {
+            const tbody = document.getElementById('holiday-table-body');
+            if (!tbody) return;
+            let html = '';
+            holidayList.forEach((h, index) => {
+                const template = clinicTemplates.find(t => t.id === h.clinicStatusId) || clinicTemplates[0];
+                let badgeColor = "bg-teal-100 text-teal-800";
+                if (h.clinicStatusId === 'morning_diag') badgeColor = "bg-amber-100 text-amber-800";
+                else if (h.clinicStatusId === 'afternoon_diag') badgeColor = "bg-indigo-100 text-indigo-800";
+
+                html += `
+                    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                        <td class="p-3 text-slate-500 font-semibold text-xs">${index + 1}</td>
+                        <td class="p-3 font-medium text-slate-800">${h.date}</td>
+                        <td class="p-3 font-bold text-teal-700">${h.name}</td>
+                        <td class="p-3 text-slate-600">${h.weekday}</td>
+                        <td class="p-3">
+                            <span class="px-2.5 py-1 rounded-md text-xs font-semibold ${badgeColor}">
+                                ${template.name} (${template.shifts.length}人: ${template.shifts.join(', ') || '無'})
+                            </span>
+                        </td>
+                        <td class="p-3 text-center">
+                            <button onclick="openHolidayModal(${index})" class="text-teal-600 hover:text-teal-800 p-1.5 transition" title="跳出視窗修改">
+                                <i class="fa-solid fa-pen"></i> 修改
+                            </button>
+                            <button type="button" onclick="deleteHoliday(${index})" class="text-rose-600 hover:text-rose-800 p-1.5 transition ml-2 cursor-pointer" title="刪除此國定假日">
+                                <i class="fa-solid fa-trash"></i> 刪除
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function deleteHoliday(index) {
+            const h = holidayList[index];
+            if (window.confirm(`確定要刪除國定假日「${h.date} - ${h.name}」嗎？刪除後將同步從排班表中移除。`)) {
+                holidayList.splice(index, 1);
+                
+                let newScheduleData = {};
+                holidayList.forEach((_, newIdx) => {
+                    let oldIdx = newIdx >= index ? newIdx + 1 : newIdx;
+                    newScheduleData[newIdx] = scheduleData[oldIdx] || {};
+                });
+                scheduleData = newScheduleData;
+
+                shiftLocks = shiftLocks.filter(lock => {
+                    if (lock.holidayIndexStart === index && (lock.holidayIndexEnd === undefined || lock.holidayIndexEnd === index)) {
+                        return false;
+                    }
+                    if (lock.holidayIndexStart > index) lock.holidayIndexStart--;
+                    if (lock.holidayIndexEnd !== undefined && lock.holidayIndexEnd > index) lock.holidayIndexEnd--;
+                    return true;
+                });
+
+                saveAllSettings();
+                showToast(`已成功刪除國定假日：${h.name}！`);
+            }
+        }
+
+        function openHolidayModal(index = -1) {
+            document.getElementById('holiday-edit-index').value = index;
+            
+            const statusSelect = document.getElementById('modal-holiday-status');
+            if (statusSelect) {
+                statusSelect.innerHTML = clinicTemplates.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+            }
+
+            if (index >= 0) {
+                const h = holidayList[index];
+                document.getElementById('holiday-modal-title').innerText = "編輯國定假日與開診狀況";
+                document.getElementById('modal-holiday-date').value = h.date;
+                document.getElementById('modal-holiday-name').value = h.name;
+                document.getElementById('modal-holiday-weekday').value = h.weekday;
+                if (statusSelect) statusSelect.value = h.clinicStatusId || "full_rest";
+            } else {
+                document.getElementById('holiday-modal-title').innerText = "新增國定假日";
+                document.getElementById('modal-holiday-date').value = "";
+                document.getElementById('modal-holiday-name').value = "";
+                document.getElementById('modal-holiday-weekday').value = "週一";
+                if (statusSelect) statusSelect.value = "full_rest";
+            }
+            document.getElementById('holiday-modal').classList.remove('hidden');
+        }
+
+        function closeHolidayModal() {
+            document.getElementById('holiday-modal').classList.add('hidden');
+        }
+
+        function saveHolidayModal() {
+            const index = parseInt(document.getElementById('holiday-edit-index').value, 10);
+            const date = document.getElementById('modal-holiday-date').value.trim();
+            const name = document.getElementById('modal-holiday-name').value.trim();
+            const weekday = document.getElementById('modal-holiday-weekday').value;
+            const clinicStatusId = document.getElementById('modal-holiday-status').value;
+
+            if (!date) {
+                alert("請輸入日期，例如：1/1 或 12/25");
+                return;
+            }
+            if (!name) {
+                alert("請輸入節日名稱！");
+                return;
+            }
+
+            if (index >= 0) {
+                holidayList[index] = { date, name, weekday, clinicStatusId };
+            } else {
+                const newIdx = holidayList.length;
+                holidayList.push({ date, name, weekday, clinicStatusId });
+                scheduleData[newIdx] = {};
+                staffList.forEach(s => {
+                    scheduleData[newIdx][s] = "休";
+                });
+            }
+
+            sortHolidaysAndRebuildSchedule();
+
+            closeHolidayModal();
+            saveAllSettings();
+            showToast("國定假日清單已更新並依日期排序！");
+        }
+
+        function renderShiftRulesTable() {
+            const tbody = document.getElementById('shift-rule-table-body');
+            if (!tbody) return;
+            let html = '';
+            shiftRules.forEach((sr, index) => {
+                html += `
+                    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                        <td class="p-3 font-bold text-teal-700">${sr.code}</td>
+                        <td class="p-3 text-slate-600">${sr.start}</td>
+                        <td class="p-3 text-slate-600">${sr.end}</td>
+                        <td class="p-3 text-xs text-slate-600">${sr.rule || '無'}</td>
+                        <td class="p-3 text-center">
+                            <button onclick="openShiftRuleModal(${index})" class="text-teal-600 hover:text-teal-800 p-1.5 transition" title="編輯">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                            <button onclick="removeShiftRule(${index})" class="text-rose-600 hover:text-rose-800 p-1.5 transition ml-2" title="刪除">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function openShiftRuleModal(index = -1) {
+            document.getElementById('shift-rule-edit-index').value = index;
+            if (index >= 0) {
+                const sr = shiftRules[index];
+                document.getElementById('shift-rule-modal-title').innerText = "編輯班別";
+                document.getElementById('modal-sr-code').value = sr.code;
+                document.getElementById('modal-sr-start').value = sr.start;
+                document.getElementById('modal-sr-end').value = sr.end;
+                document.getElementById('modal-sr-rule').value = sr.rule;
+            } else {
+                document.getElementById('shift-rule-modal-title').innerText = "新增班別";
+                document.getElementById('modal-sr-code').value = '';
+                document.getElementById('modal-sr-start').value = '08:00';
+                document.getElementById('modal-sr-end').value = '17:00';
+                document.getElementById('modal-sr-rule').value = '';
+            }
+            document.getElementById('shift-rule-modal').classList.remove('hidden');
+        }
+
+        function closeShiftRuleModal() {
+            document.getElementById('shift-rule-modal').classList.add('hidden');
+        }
+
+        function saveShiftRuleModal() {
+            const index = parseInt(document.getElementById('shift-rule-edit-index').value, 10);
+            const code = document.getElementById('modal-sr-code').value.trim();
+            const start = document.getElementById('modal-sr-start').value.trim();
+            const end = document.getElementById('modal-sr-end').value.trim();
+            const rule = document.getElementById('modal-sr-rule').value.trim();
+
+            if (!code) {
+                alert("請輸入班表代號！");
+                return;
+            }
+
+            if (index >= 0) {
+                shiftRules[index] = { code, start, end, rule };
+            } else {
+                shiftRules.push({ code, start, end, rule });
+            }
+
+            closeShiftRuleModal();
+            renderShiftRulesTable();
+            showToast("班別已更新，請點擊「修改儲存設定」！");
+        }
+
+        function removeShiftRule(index) {
+            if (shiftRules.length <= 1) {
+                alert("至少需保留一筆班別設定！");
+                return;
+            }
+            shiftRules.splice(index, 1);
+            renderShiftRulesTable();
+            showToast("班別已刪除，請點擊「修改儲存設定」！");
+        }
+
+        function renderStaffList() {
+            const grid = document.getElementById('staff-grid');
+            if (!grid) return;
+            let html = '';
+            staffList.forEach((staff, index) => {
+                html += `
+                    <div class="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl shadow-xs">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-teal-100 text-teal-800 font-bold flex items-center justify-center text-xs">
+                                ${index + 1}
+                            </div>
+                            <span class="font-semibold text-slate-800 text-sm">${staff}</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <button onclick="editStaff(${index})" class="text-slate-400 hover:text-teal-600 p-1.5 rounded-lg transition" title="編輯">
+                                <i class="fa-solid fa-pen text-xs"></i>
+                            </button>
+                            <button onclick="removeStaff(${index})" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg transition" title="刪除">
+                                <i class="fa-solid fa-trash text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            grid.innerHTML = html;
+        }
+
+        function addStaff() {
+            const input = document.getElementById('new-staff-name');
+            if (!input) return;
+            const name = input.value.trim();
+            if (!name) {
+                alert("請輸入同仁姓名！");
+                return;
+            }
+            if (staffList.includes(name)) {
+                alert("此同仁姓名已存在！");
+                return;
+            }
+            staffList.push(name);
+            input.value = '';
+            renderStaffList();
+            showToast(`已新增同仁 ${name}，請點擊「修改儲存設定」！`);
+        }
+
+        function editStaff(index) {
+            const newName = prompt("請輸入新的同仁姓名：", staffList[index]);
+            if (newName && newName.trim() !== "") {
+                const trimmed = newName.trim();
+                const oldName = staffList[index];
+                staffList[index] = trimmed;
+                
+                Object.keys(scheduleData).forEach(hIdx => {
+                    if (scheduleData[hIdx][oldName] !== undefined) {
+                        scheduleData[hIdx][trimmed] = scheduleData[hIdx][oldName];
+                        delete scheduleData[hIdx][oldName];
+                    }
+                });
+
+                renderStaffList();
+                showToast("同仁姓名已修改，請點擊「修改儲存設定」！");
+            }
+        }
+
+        function removeStaff(index) {
+            if (staffList.length <= 5) {
+                alert("最少需保留 5 位同仁！");
+                return;
+            }
+            const removed = staffList.splice(index, 1)[0];
+            renderStaffList();
+            showToast(`已刪除同仁 ${removed}，請點擊「修改儲存設定」！`);
+        }
+
+        // 依籤號排序的顯示順序
+        function getDisplayOrder() {
+            return staffList
+                .map((staff, idx) => {
+                    const ticketNo = blindDrawMap[staff] !== undefined ? blindDrawMap[staff] : (idx + 1);
+                    return { staff, ticketNo };
+                })
+                .sort((a, b) => a.ticketNo - b.ticketNo);
+        }
+
+        // 直式排班表：列 = 籤號/姓名，欄 = 日期
+        function renderScheduleTable() {
+            const headerRow = document.getElementById('schedule-header');
+            const tbody = document.getElementById('schedule-body');
+            if (!headerRow || !tbody) return;
+
+            const displayOrder = getDisplayOrder();
+
+            let headerHtml = `<th class="p-3 sticky left-0 bg-slate-200 z-10 shadow-sm min-w-[140px]">籤號 / 姓名</th>`;
+            holidayList.forEach((h, hIdx) => {
+                headerHtml += `
+                    <th class="p-3 text-center min-w-[110px] bg-slate-100">
+                        <div class="text-xs font-bold text-teal-700">${h.date}</div>
+                        <div class="text-[10px] text-slate-500">${h.name} (${h.weekday})</div>
+                    </th>
+                `;
+            });
+            headerHtml += `<th class="p-3 text-center min-w-[120px] bg-slate-100">上班 / 休假統計</th>`;
+            headerRow.innerHTML = headerHtml;
+
+            let bodyHtml = '';
+            displayOrder.forEach(({ staff, ticketNo }) => {
+                let workCount = 0;
+                let restCount = 0;
+
+                const hasDrawn = blindDrawMap[staff] !== undefined;
+                const titleHtml = hasDrawn
+                    ? `<span class="font-bold text-slate-800">${staff}</span><br><span class="text-xs text-amber-600 font-mono">🎫 籤號 ${ticketNo} 號</span>`
+                    : `<span class="font-mono font-bold text-slate-700">籤號 ${ticketNo} 號</span><br><span class="text-[10px] text-slate-400">（尚未抽籤）</span>`;
+
+                bodyHtml += `<tr class="hover:bg-slate-50 transition border-b border-slate-100">`;
+                bodyHtml += `
+                    <td class="p-3 sticky left-0 bg-white font-medium text-slate-800 shadow-sm align-middle">
+                        ${titleHtml}
+                    </td>
+                `;
+
+                holidayList.forEach((h, hIdx) => {
+                    if (!scheduleData[hIdx]) scheduleData[hIdx] = {};
+                    const currentShift = scheduleData[hIdx][staff] || "休";
+
+                    let badgeClass = "bg-slate-100 text-slate-600";
+                    if (currentShift === "D△") badgeClass = "bg-blue-100 text-blue-800 font-bold";
+                    else if (currentShift === "D▲") badgeClass = "bg-indigo-100 text-indigo-800 font-bold";
+                    else if (currentShift === "E△") badgeClass = "bg-amber-100 text-amber-800 font-bold";
+                    else if (currentShift === "E▲") badgeClass = "bg-orange-100 text-orange-800 font-bold";
+                    else if (currentShift === "N") badgeClass = "bg-purple-100 text-purple-800 font-bold";
+
+                    if (currentShift === "休") restCount++;
+                    else workCount++;
+
+                    bodyHtml += `
+                        <td class="p-2 text-center align-middle">
+                            <select onchange="updateShift(${hIdx}, '${staff}', this.value)"
+                                    class="text-xs font-bold px-2 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500 ${badgeClass}">
+                                <option value="休" ${currentShift === '休' ? 'selected' : ''}>休</option>
+                                <option value="D△" ${currentShift === 'D△' ? 'selected' : ''}>D△</option>
+                                <option value="D▲" ${currentShift === 'D▲' ? 'selected' : ''}>D▲</option>
+                                <option value="E△" ${currentShift === 'E△' ? 'selected' : ''}>E△</option>
+                                <option value="E▲" ${currentShift === 'E▲' ? 'selected' : ''}>E▲</option>
+                                <option value="N"  ${currentShift === 'N'  ? 'selected' : ''}>N</option>
+                            </select>
+                        </td>
+                    `;
+                });
+
+                bodyHtml += `
+                    <td class="p-2 text-center align-middle text-xs">
+                        <div class="text-teal-700 font-bold mb-1">上班 ${workCount} 天</div>
+                        <div class="text-slate-600 font-semibold">休假 ${restCount} 天</div>
+                    </td>
+                `;
+
+                bodyHtml += `</tr>`;
+            });
+
+            tbody.innerHTML = bodyHtml;
+        }
+
+        function updateShift(hIdx, staff, val) {
+            if (!scheduleData[hIdx]) scheduleData[hIdx] = {};
+            scheduleData[hIdx][staff] = val;
+            renderStats();
+            showToast(`已更新 ${holidayList[hIdx].date} 該欄位為 ${val}，請點擊「修改儲存設定」！`);
+        }
+
+        // 統計卡片：依籤號排序，與排班表對應
+        function renderStats() {
+            const grid = document.getElementById('stats-grid');
+            if (!grid) return;
+            let html = '';
+
+            const displayOrder = getDisplayOrder();
+
+            let totalSlotsNeeded = 0;
+            holidayList.forEach(h => {
+                const template = clinicTemplates.find(t => t.id === h.clinicStatusId) || clinicTemplates[0];
+                totalSlotsNeeded += template.shifts.length;
+            });
+            const targetWork = staffList.length > 0 ? Math.round(totalSlotsNeeded / staffList.length) : 0;
+
+            displayOrder.forEach(({ staff, ticketNo }) => {
+                let workCount = 0;
+                let restCount = 0;
+
+                holidayList.forEach((_, hIdx) => {
+                    if (scheduleData[hIdx] && scheduleData[hIdx][staff] && scheduleData[hIdx][staff] !== "休") {
+                        workCount++;
+                    } else {
+                        restCount++;
+                    }
+                });
+
+                const isBalanced = Math.abs(workCount - targetWork) <= 1;
+                const hasDrawn = blindDrawMap[staff] !== undefined;
+
+                const titleHtml = hasDrawn
+                    ? `${staff} <span class="text-xs text-amber-600 font-bold">(籤號 ${ticketNo} 號)</span>`
+                    : `<span class="font-mono font-bold text-slate-700">籤號 ${ticketNo} 號</span>`;
+
+                html += `
+                    <div class="bg-slate-50 border border-slate-200 p-5 rounded-xl shadow-xs flex flex-col justify-between space-y-4">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h3 class="font-bold text-slate-800 text-base">${titleHtml}</h3>
+                            </div>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${isBalanced ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+                                ${isBalanced ? '✓ 分配均衡' : '⚡ 負載調整中'}
+                            </span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200/60">
+                            <div>
+                                <span class="text-xs text-slate-500 block">上班天數</span>
+                                <span class="text-xl font-bold text-teal-700">${workCount} <span class="text-xs font-normal text-slate-500">天</span></span>
+                            </div>
+                            <div>
+                                <span class="text-xs text-slate-500 block">休假天數</span>
+                                <span class="text-xl font-bold text-slate-700">${restCount} <span class="text-xs font-normal text-slate-500">天</span></span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            grid.innerHTML = html;
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('border-b-2', 'border-teal-600', 'text-teal-700', 'font-semibold');
+                el.classList.add('text-slate-500', 'font-medium');
+            });
+
+            const activeTab = document.getElementById(`tab-${tabName}`);
+            if (activeTab) activeTab.classList.remove('hidden');
+
+            const activeBtn = document.getElementById(`tab-btn-${tabName}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('text-slate-500', 'font-medium');
+                activeBtn.classList.add('border-b-2', 'border-teal-600', 'text-teal-700', 'font-semibold');
+            }
+        }
+
+        function exportCSV() {
+            let csvContent = "\uFEFF"; 
+            
+            let headerRow = ["籤號/姓名"];
+            holidayList.forEach(h => {
+                headerRow.push(`${h.date}-${h.name}`);
+            });
+            headerRow.push("上班天數", "休假天數");
+            csvContent += headerRow.join(",") + "\n";
+
+            const displayOrder = getDisplayOrder();
+
+            displayOrder.forEach(({ staff, ticketNo }) => {
+                let workCount = 0;
+                let restCount = 0;
+                let label = blindDrawMap[staff] !== undefined ? `${staff}(${ticketNo}號)` : `籤號${ticketNo}號`;
+
+                let row = [`"${label}"`];
+                holidayList.forEach((h, hIdx) => {
+                    const shift = (scheduleData[hIdx] && scheduleData[hIdx][staff]) || "休";
+                    if (shift === "休") restCount++; else workCount++;
+                    row.push(shift);
+                });
+                row.push(workCount, restCount);
+                csvContent += row.join(",") + "\n";
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', `國定假日排班表_116年度.csv`);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast("排班表 Excel (CSV) 匯出成功！");
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            const msgEl = document.getElementById('toast-msg');
+            if (!toast || !msgEl) return;
+            msgEl.innerText = msg;
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        function hideToast() {
+            const toast = document.getElementById('toast');
+            if (toast) toast.classList.add('hidden');
+        }
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>
